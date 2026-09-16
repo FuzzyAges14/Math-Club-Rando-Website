@@ -62,7 +62,28 @@ export default function Home() {
         error?: string;
     }; if (!r.ok)
         throw new Error(d.error || "Unable to load the club. Please try again."); setData({ ...empty, ...d }); }
-    useEffect(() => { refresh().catch(e => setError(e.message)).finally(() => setLoading(false)); }, []);
+    useEffect(() => {
+        const controller = new AbortController();
+        async function loadClub() {
+            try {
+                const response = await fetch("/api/club", { signal: controller.signal });
+                const club = await response.json() as Club & { error?: string };
+                if (!response.ok)
+                    throw new Error(club.error || "Unable to load the club. Please try again.");
+                setData({ ...empty, ...club });
+            }
+            catch (loadError) {
+                if (!controller.signal.aborted)
+                    setError(loadError instanceof Error ? loadError.message : "Unable to load the club. Please try again.");
+            }
+            finally {
+                if (!controller.signal.aborted)
+                    setLoading(false);
+            }
+        }
+        void loadClub();
+        return () => controller.abort();
+    }, []);
     useEffect(() => { const controller = new AbortController(); const mc = (document as Document & {
         modelContext?: {
             registerTool: (t: unknown, options: {
